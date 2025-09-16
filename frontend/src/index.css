@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  @apply h-full antialiased;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 transition-colors duration-300 ease-in-out;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+a {
+  @apply text-brand-500 hover:text-brand-600 transition-colors;
+}
+
+button:focus-visible {
+  @apply outline-none ring-2 ring-brand-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-950;
+}
