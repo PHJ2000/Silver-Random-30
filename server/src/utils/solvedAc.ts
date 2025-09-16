@@ -1,4 +1,4 @@
-import type { Problem } from 'shared/types'
+import type { Problem } from '../../../shared/types.js'
 
 const SOLVED_ENDPOINT = 'https://solved.ac/api/v3/search/problem'
 const PAGE_SIZE = 100

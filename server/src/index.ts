@@ -6,6 +6,7 @@ import problemsRouter from './routes/problems.js'
 import runsRouter from './routes/runs.js'
 import leaderboardRouter from './routes/leaderboard.js'
 import webhookRouter from './routes/webhook.js'
+import configRouter from './routes/config.js'
 import { startWeeklyJob } from './jobs/weekly.js'
 
 const app = express()
@@ -39,6 +40,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+app.use('/api/config', configRouter)
 app.use('/api/problems', problemsRouter)
 app.use('/api/runs', runsRouter)
 app.use('/api/leaderboard', leaderboardRouter)

@@ -153,3 +153,37 @@ export async function fetchLeaderboard(weekStart?: string): Promise<{ weekStart:
   }
   return (await response.json()) as { weekStart: string; items: LeaderboardItem[] }
 }
+
+export interface SyncRunResponse {
+  ok: boolean
+  result: RunResult
+  solved: boolean
+  tried: boolean
+  points?: number
+  timeRemainingSec: number
+}
+
+export async function syncRunFromSolvedAc(args: {
+  id: string
+  endedAt: number
+  revealsUsed: number
+  notes?: string
+  apiKey?: string
+  webhookUrl?: string
+}): Promise<SyncRunResponse> {
+  const response = await fetch(`/api/runs/${args.id}/sync`, {
+    method: 'POST',
+    headers: buildHeaders(args.apiKey),
+    body: JSON.stringify({
+      endedAt: args.endedAt,
+      revealsUsed: args.revealsUsed,
+      notes: args.notes,
+      webhookOverride: args.webhookUrl,
+    }),
+  })
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`기록 동기화 실패: ${response.status} ${detail}`)
+  }
+  return (await response.json()) as SyncRunResponse
+}

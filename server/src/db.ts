@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS runs (
   result TEXT CHECK(result IN ('solved','failed','partial')) DEFAULT 'failed',
   timeRemainingSec INTEGER DEFAULT 0,
   revealsUsed INTEGER DEFAULT 0,
-  notes TEXT
+  notes TEXT,
+  webhookOverride TEXT
 )
 `
 
@@ -45,4 +46,10 @@ CREATE TABLE IF NOT EXISTS weekly_cache (
 `
 
 db.exec(createRunsTable)
+
+const runColumns = db.prepare("PRAGMA table_info('runs')").all() as Array<{ name: string }>
+const hasWebhookOverrideColumn = runColumns.some((column) => column.name === 'webhookOverride')
+if (!hasWebhookOverrideColumn) {
+  db.exec("ALTER TABLE runs ADD COLUMN webhookOverride TEXT")
+}
 db.exec(createWeeklyCacheTable)

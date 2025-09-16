@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
 import { MiniTimerPage } from './pages/MiniTimerPage'
 import { useSettingsStore } from './store/settings'
+import { useServerConfigStore } from './store/serverConfig'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -72,6 +73,24 @@ function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const fetchConfig = useServerConfigStore((state) => state.fetchConfig)
+  const config = useServerConfigStore((state) => state.config)
+  const setSettings = useSettingsStore((state) => state.setSettings)
+
+  useEffect(() => {
+    fetchConfig().catch((error) => {
+      console.warn('Failed to load server config', error)
+    })
+  }, [fetchConfig])
+
+  useEffect(() => {
+    if (!config) return
+    if (config.timezone) {
+      dayjs.tz.setDefault(config.timezone)
+    }
+    setSettings({ apiKey: config.apiKey ?? undefined })
+  }, [config, setSettings])
+
   return (
     <Routes>
       <Route

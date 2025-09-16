@@ -13,8 +13,8 @@ import { useRunEvents } from '../hooks/useRunEvents'
 import { useAutoReveal } from '../hooks/useAutoReveal'
 import { ensureNotificationPermission, notifyTimerFinished } from '../utils/notifications'
 import { playAlarm } from '../utils/alarm'
-import { createRun, fetchRandomProblem, fetchRuns, finishRun } from '../utils/api'
-import type { Run, RunResult } from 'shared/types'
+import { createRun, fetchRandomProblem, fetchRuns, syncRunFromSolvedAc } from '../utils/api'
+import type { Run } from 'shared/types'
 
 const numberFormat = new Intl.NumberFormat('ko-KR')
 
@@ -56,12 +56,15 @@ export function HomePage() {
   }))
 
   const [statusMessages, setStatusMessages] = useState<string[]>([])
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [querySummary, setQuerySummary] = useState<string | undefined>(undefined)
   const [history, setHistory] = useState<Run[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [lastNotificationAt, setLastNotificationAt] = useState<number | null>(null)
+
+  const trimmedHandle = settings.bojHandle.trim()
 
   const timer = useCountdown()
   const hasFinished = !timer.isRunning && timer.seconds <= 0
@@ -73,13 +76,13 @@ export function HomePage() {
 
   const fetchHistory = useCallback(() => {
     setHistoryLoading(true)
-    fetchRuns(settings.bojHandle, settings.historyLimit)
+    fetchRuns(trimmedHandle, settings.historyLimit)
       .then(setHistory)
       .catch((err) => {
         console.warn(err)
       })
       .finally(() => setHistoryLoading(false))
-  }, [settings.bojHandle, settings.historyLimit])
+  }, [trimmedHandle, settings.historyLimit])
 
   useEffect(() => {
     fetchHistory()
@@ -88,6 +91,7 @@ export function HomePage() {
   const handleFetchProblem = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSyncStatus(null)
     try {
       const response = await fetchRandomProblem(settings)
       setProblem(response.problem, settings.defaultDurationMin * 60)
@@ -121,6 +125,7 @@ export function HomePage() {
 
   const handleOpenBaekjoon = useCallback(async () => {
     if (!problem) return
+    setSyncStatus(null)
     ensureNotificationPermission()
     const now = Date.now()
     timer.start(timer.durationMs)
@@ -128,7 +133,7 @@ export function HomePage() {
     setStartedAt(now)
     try {
       const response = await createRun({
-        handle: settings.bojHandle || 'anonymous',
+        handle: trimmedHandle || 'anonymous',
         problem,
         tier: problem.tier,
         durationSec: Math.round(timer.durationMs / 1000),
@@ -147,7 +152,7 @@ export function HomePage() {
     setRunId,
     setStartedAt,
     settings.apiKey,
-    settings.bojHandle,
+    trimmedHandle,
     settings.webhookOverride,
     timer,
   ])
@@ -163,6 +168,7 @@ export function HomePage() {
     setResult(null)
     setNotes('')
     setDurationSec(settings.defaultDurationMin * 60)
+    setSyncStatus(null)
   }, [setDurationSec, setNotes, setResult, setRunId, setStartedAt, settings.defaultDurationMin, timer])
 
   const handleExtend = useCallback(() => {
@@ -174,34 +180,43 @@ export function HomePage() {
     window.open(`${window.location.origin}/mini`, 'solandi-mini', 'width=320,height=200')
   }
 
-  const handleFinish = useCallback(
-    async (resultType: RunResult) => {
-      if (!runId) {
-        setError('진행 중인 기록이 없습니다.')
-        return
-      }
-      timer.pause()
-      try {
-        const endedAt = Date.now()
-        const timeRemainingSec = Math.max(0, Math.floor(timer.remainingMs / 1000))
-        await finishRun({
-          id: runId,
-          result: resultType,
-          endedAt,
-          timeRemainingSec,
-          revealsUsed,
-          notes,
-          apiKey: settings.apiKey,
-          webhookUrl: settings.webhookOverride,
-        })
-        setResult(resultType)
-        fetchHistory()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '결과 전송에 실패했습니다.')
-      }
-    },
-    [fetchHistory, notes, revealsUsed, runId, setResult, settings.apiKey, settings.webhookOverride, timer],
-  )
+
+  const handleSyncRecords = useCallback(async () => {
+    if (!runId) {
+      setError('진행 중인 기록이 없습니다.')
+      return
+    }
+    if (!trimmedHandle) {
+      setError('백준 핸들을 설정하면 solved.ac 기록을 불러올 수 있습니다.')
+      return
+    }
+    timer.pause()
+    setError(null)
+    setSyncStatus('solved.ac 기록을 확인하는 중입니다...')
+    try {
+      const endedAt = Date.now()
+      const response = await syncRunFromSolvedAc({
+        id: runId,
+        endedAt,
+        revealsUsed,
+        notes,
+        apiKey: settings.apiKey,
+        webhookUrl: settings.webhookOverride,
+      })
+      setResult(response.result)
+      const message =
+        response.result === 'solved'
+          ? '✅ solved.ac 기록을 기반으로 해결 완료로 저장했어요.'
+          : response.result === 'partial'
+          ? '🟡 solved.ac에서 시도 기록만 확인되어 부분 성공으로 저장했어요.'
+          : '❌ solved.ac에서 제출 기록을 찾지 못해 실패로 저장했어요.'
+      setSyncStatus(message)
+      fetchHistory()
+    } catch (err) {
+      setSyncStatus(null)
+      setError(err instanceof Error ? err.message : '기록 동기화에 실패했습니다.')
+    }
+  }, [runId, trimmedHandle, settings.apiKey, settings.webhookOverride, timer, revealsUsed, notes, setResult, fetchHistory])
 
   const prevFinishedRef = useRef(false)
   useEffect(() => {
@@ -251,33 +266,30 @@ export function HomePage() {
             onOpenPopup={handleOpenPopup}
             extendMinutes={timerExtendMinutes}
           />
-          <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
-            <button
-              type="button"
-              onClick={() => handleFinish('solved')}
-              className="rounded-lg bg-emerald-500 px-3 py-2 font-semibold text-white"
-            >
-              해결 완료
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFinish('partial')}
-              className="rounded-lg bg-amber-500 px-3 py-2 font-semibold text-white"
-            >
-              부분 성공
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFinish('failed')}
-              className="rounded-lg bg-rose-500 px-3 py-2 font-semibold text-white"
-            >
-              실패
-            </button>
+          <div className="mt-4 space-y-3 text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSyncRecords}
+                disabled={!runId || !trimmedHandle}
+                className="rounded-lg bg-brand-500 px-3 py-2 font-semibold text-white shadow-sm transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                기록 가져오기
+              </button>
+              {!trimmedHandle && (
+                <span className="text-[11px] text-slate-500 dark:text-slate-500">백준 핸들을 설정하면 solved.ac 기록을 자동으로 불러올 수 있어요.</span>
+              )}
+            </div>
+            {syncStatus && (
+              <p className="rounded-lg bg-slate-100/80 px-3 py-2 text-[13px] text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                {syncStatus}
+              </p>
+            )}
             <textarea
               value={notes}
               onChange={handleNotesChange}
               placeholder="메모를 남겨보세요"
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
         </div>

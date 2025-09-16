@@ -1,5 +1,6 @@
 import { ChangeEvent, useMemo, useRef } from 'react'
 import { useSettingsStore, exportSettings, importSettings } from '../store/settings'
+import { useServerConfigStore } from '../store/serverConfig'
 import { useSettingsFileSync } from '../hooks/useSettingsFileSync'
 
 const supportsFileSystemAccess = typeof window !== 'undefined' && 'showOpenFilePicker' in window
@@ -26,6 +27,11 @@ async function readFile(file: File) {
 
 export function SettingsPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { config: serverConfig, loading: configLoading, error: configError } = useServerConfigStore((state) => ({
+    config: state.config,
+    loading: state.loading,
+    error: state.error,
+  }))
   const { settings, setSettings, setFileHandle } = useSettingsStore((state) => ({
     settings: state.settings,
     setSettings: state.setSettings,
@@ -127,6 +133,36 @@ export function SettingsPanel() {
           </button>
           <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImport} />
         </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">서버 환경 변수</p>
+        {configError ? (
+          <p className="mt-2 text-rose-500 dark:text-rose-300">{configError}</p>
+        ) : configLoading ? (
+          <p className="mt-2 text-slate-500 dark:text-slate-400">불러오는 중...</p>
+        ) : serverConfig ? (
+          <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="font-medium text-slate-500 dark:text-slate-400">Discord 웹훅 (기본)</dt>
+              <dd className="break-all text-slate-700 dark:text-slate-200">{serverConfig.discordWebhookUrl ?? '설정되지 않음'}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500 dark:text-slate-400">API 키</dt>
+              <dd className="text-slate-700 dark:text-slate-200">{serverConfig.apiKey ? '적용됨' : '설정되지 않음'}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500 dark:text-slate-400">타임존</dt>
+              <dd className="text-slate-700 dark:text-slate-200">{serverConfig.timezone}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500 dark:text-slate-400">서버 포트</dt>
+              <dd className="text-slate-700 dark:text-slate-200">{serverConfig.port}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="mt-2 text-slate-500 dark:text-slate-400">서버 설정을 가져오지 못했습니다.</p>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -293,16 +329,6 @@ export function SettingsPanel() {
           />
         </label>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">API 키</span>
-          <input
-            type="password"
-            value={settings.apiKey ?? ''}
-            onChange={(event) => setSettings({ apiKey: event.target.value })}
-            placeholder="서버 API 키"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-          />
-        </label>
       </div>
 
       {supportsFileSystemAccess && (
