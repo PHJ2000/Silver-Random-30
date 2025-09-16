@@ -145,7 +145,9 @@ export function SettingsPanel() {
           <dl className="mt-2 grid gap-2 sm:grid-cols-2">
             <div>
               <dt className="font-medium text-slate-500 dark:text-slate-400">Discord 웹훅 (기본)</dt>
-              <dd className="break-all text-slate-700 dark:text-slate-200">{serverConfig.discordWebhookUrl ?? '설정되지 않음'}</dd>
+              <dd className="text-slate-700 dark:text-slate-200">
+                {serverConfig.hasDiscordWebhook ? '설정됨' : '없음'}
+              </dd>
             </div>
             <div>
               <dt className="font-medium text-slate-500 dark:text-slate-400">API 키</dt>

@@ -25,7 +25,7 @@ export interface Run {
 }
 
 export interface ServerConfig {
-  discordWebhookUrl: string | null
+  hasDiscordWebhook: boolean
   port: number
   timezone: string
   apiKey: string | null
