@@ -187,7 +187,8 @@ export function HomePage() {
       return
     }
     if (!trimmedHandle) {
-      setError('백준 핸들을 설정하면 solved.ac 기록을 불러올 수 있습니다.')
+      setError(null)
+      setSyncStatus('⚠️ solved.ac 기록을 동기화하려면 설정에서 백준 핸들을 입력해주세요.')
       return
     }
     timer.pause()
@@ -271,13 +272,15 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={handleSyncRecords}
-                disabled={!runId || !trimmedHandle}
+                disabled={!runId}
                 className="rounded-lg bg-brand-500 px-3 py-2 font-semibold text-white shadow-sm transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 기록 가져오기
               </button>
               {!trimmedHandle && (
-                <span className="text-[11px] text-slate-500 dark:text-slate-500">백준 핸들을 설정하면 solved.ac 기록을 자동으로 불러올 수 있어요.</span>
+                <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  solved.ac 기록을 가져오려면 설정 패널에서 백준 핸들을 입력해주세요.
+                </span>
               )}
             </div>
             {syncStatus && (
