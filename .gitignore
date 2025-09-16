@@ -1,5 +1,8 @@
 node_modules/
+**/node_modules/
 dist/
+app/dist/
+server/dist/
 .DS_Store
 .env
 npm-debug.log*
@@ -7,3 +10,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .tmp/
+app/.tmp/
+server/.tmp/
+data/
+.env.local
+*.tsbuildinfo
+app/vite.config.js
+app/vite.config.d.ts
