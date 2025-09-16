@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import { db } from '../db.js'
 import { sendDiscord } from '../utils/discord.js'
 import { calculateRunPoints } from '../utils/scoring.js'
+import { fetchUserProblemProgress } from '../utils/progress.js'
 
 const router = Router()
 
@@ -111,6 +112,74 @@ router.post('/:id/finish', (req: Request, res: Response) => {
     return res.json({ ok: true, points })
   } catch (error) {
     const message = error instanceof Error ? error.message : '기록 업데이트에 실패했습니다.'
+    return res.status(400).json({ error: message })
+  }
+})
+
+router.post('/:id/sync', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id)
+    const endedAt = Number.parseInt(String(req.body?.endedAt ?? Date.now()), 10)
+    if (!Number.isInteger(endedAt) || endedAt <= 0) {
+      throw new Error('endedAt이 유효하지 않습니다.')
+    }
+    const revealsUsed = Number.parseInt(String(req.body?.revealsUsed ?? 0), 10)
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes : null
+    const webhookOverride = typeof req.body?.webhookOverride === 'string' ? req.body.webhookOverride : null
+
+    const info = db
+      .prepare('SELECT handle, problemId, tier, durationSec, startedAt, webhookOverride FROM runs WHERE id = ?')
+      .get(id) as {
+        handle: string
+        problemId: number
+        tier?: string | null
+        durationSec: number
+        startedAt: number
+        webhookOverride?: string | null
+      } | undefined
+
+    if (!info) {
+      return res.status(404).json({ error: '존재하지 않는 기록입니다.' })
+    }
+
+    const progress = await fetchUserProblemProgress({ handle: info.handle, problemId: info.problemId })
+
+    const result: RunResult = progress.solved ? 'solved' : progress.tried ? 'partial' : 'failed'
+    const safeReveals = Math.max(0, revealsUsed)
+    const elapsedSec = Math.max(0, Math.floor((endedAt - info.startedAt) / 1000))
+    const timeRemainingSec = Math.max(0, info.durationSec - elapsedSec)
+    const durationUsed = info.durationSec - timeRemainingSec
+
+    db.prepare(
+      `UPDATE runs
+       SET endedAt = ?, result = ?, timeRemainingSec = ?, revealsUsed = ?, notes = ?, webhookOverride = COALESCE(?, webhookOverride)
+       WHERE id = ?`,
+    ).run(endedAt, result, timeRemainingSec, safeReveals, notes, webhookOverride, id)
+
+    const points = calculateRunPoints({ result, timeRemainingSec, revealsUsed: safeReveals })
+
+    const progressSummary = progress.solved
+      ? 'solved.ac에서 해결 기록을 확인했습니다.'
+      : progress.tried
+      ? 'solved.ac에서 시도 기록을 확인했습니다.'
+      : 'solved.ac 제출 기록이 없습니다.'
+
+    const description =
+      result === 'solved'
+        ? `✅ 해결! 남은 시간 ${timeRemainingSec}초, 점수 ${points}점`
+        : result === 'partial'
+        ? `부분 성공. 남은 시간 ${timeRemainingSec}초`
+        : '❌ 실패'
+
+    void sendDiscord(
+      `🏁 실랜디 자동 기록: **${info.handle}** — #${info.problemId} (${result})\n소요 ${durationUsed}초, 남은 ${timeRemainingSec}초, 힌트 ${safeReveals}회\n${progressSummary}\n${description}`,
+      undefined,
+      webhookOverride || info.webhookOverride || undefined,
+    )
+
+    return res.json({ ok: true, result, solved: progress.solved, tried: progress.tried, points, timeRemainingSec })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '기록 동기화에 실패했습니다.'
     return res.status(400).json({ error: message })
   }
 })

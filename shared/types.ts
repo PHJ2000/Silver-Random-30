@@ -23,3 +23,10 @@ export interface Run {
   revealsUsed?: number
   notes?: string
 }
+
+export interface ServerConfig {
+  discordWebhookUrl: string | null
+  port: number
+  timezone: string
+  apiKey: string | null
+}
