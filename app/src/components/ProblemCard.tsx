@@ -146,8 +146,16 @@ export function ProblemCard({
           </div>
         </div>
       ) : (
-        <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white/40 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-          아직 추천된 문제가 없어요. “문제 뽑기” 버튼을 눌러 시작해 보세요!
+        <div className="mt-6 space-y-4 rounded-lg border border-dashed border-slate-300 bg-white/40 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+          <p>아직 추천된 문제가 없어요. “문제 뽑기” 버튼을 눌러 시작해 보세요!</p>
+          <button
+            type="button"
+            onClick={onFetchNew}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-400 px-4 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-500/60 dark:text-brand-200 dark:hover:bg-brand-500/10"
+          >
+            {loading ? '불러오는 중...' : '문제 뽑기'}
+          </button>
         </div>
       )}
     </div>
